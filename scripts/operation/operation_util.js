@@ -171,6 +171,7 @@ var OperationUtil = ( function () {
 
 		var aRewardDataFields = [
 			{ objHandle:'points', value: 'points'},
+			{ objHandle:'flags', value: 'flags'},
 			{ objHandle:'uiOrder', value: 'ui_order'},
 			{ objHandle:'imagePath', value: 'ui_image'},
 			{ objHandle:'imagePathInspect', value: 'ui_image_inspect'},
@@ -300,6 +301,18 @@ var OperationUtil = ( function () {
 		return totalPoints;
 	};
 
+	function _IfOperationEndedGetExtendedSeasonWithRedeemableBalance()
+	{
+		var nActiveSeason = 9;                                                                                                                   
+		_ValidateOperationInfo( nActiveSeason );
+		if ( m_numRedeemableBalance <= 0 )
+		{
+			UiToolkitAPI.ShowGenericPopup( '#op_stars_shop_title', '#op_stars_shop_operation_over', "" );
+			return -1;
+		}
+		return nActiveSeason;
+	}
+
 	function _OpenPopupCustomLayoutOperationHub ( rewardIdxToSetWhenOpen )
 	{
 		var nActiveSeason = GameTypesAPI.GetActiveSeasionIndexValue();
@@ -323,6 +336,9 @@ var OperationUtil = ( function () {
 	function _OpenPopupCustomLayoutOperationStore()
 	{
 		var nActiveSeason = GameTypesAPI.GetActiveSeasionIndexValue();
+		if ( nActiveSeason < 0 )
+			nActiveSeason = _IfOperationEndedGetExtendedSeasonWithRedeemableBalance();
+
 		if ( nActiveSeason < 0 )
 			return;
 
@@ -523,6 +539,9 @@ var OperationUtil = ( function () {
 
 	var _IsMissionLockedBehindPremiumOperationPass = function( missionCardId, MissionItemID, nSeasonAccess )
 	{
+		                                     
+		return false;
+
 		                                                                                          
 		var gameMode = InventoryAPI.GetQuestGameMode( MissionItemID );
 		if ( gameMode !== 'competitive' )
