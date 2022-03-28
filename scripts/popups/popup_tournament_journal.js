@@ -13,20 +13,21 @@ var TournamentJournal = ( function()
     var m_activeTournament = 18;
     var m_tokenItemDefName = null;
     var m_scheduleHandle = null;
-
-    var m_isInMatch = GameStateAPI.IsDemoOrHltv() || GameStateAPI.IsLocalPlayerPlayingMatch(); 
+    var m_isTournament_active = false;
+    var m_isInMatch = GameStateAPI.IsDemoOrHltv() || GameStateAPI.IsLocalPlayerPlayingMatch();
 
     var _Init = function()
     {
         var journalId = $.GetContextPanel().GetAttributeString( "journalid", '' );
         var tournamentId = InventoryAPI.GetItemAttributeValue( journalId, "tournament event id" );
+        var bNoItemsOnSale = true;
+        $.GetContextPanel().SetHasClass( 'no_items', bNoItemsOnSale );
+
                            
-		                      
-		
-		switch ( tournamentId ) {                                                               
-			case 18: m_tokenItemDefName = 'tournament_pass_stockh2021_charge'; break;
-		}
-		
+                              
+
+		m_tokenItemDefName = 'tournament_pass_stockh2021_charge';
+
                                      
         var nCampaignID = parseInt( InventoryAPI.GetItemAttributeValue( journalId, "campaign id" ) );
                                                 
@@ -52,14 +53,17 @@ var TournamentJournal = ( function()
             } );
         }
 
-        $.GetContextPanel().SetHasClass( 'tournament-over', m_activeTournament !== tournamentId );
+        var oWinningTeam = !_IsValidJournalId( journalId ) ? null : EventUtil.GetTournamentWinner( tournamentId, 1 );
+        m_isTournament_active = oWinningTeam === null || !oWinningTeam.hasOwnProperty( 'team_id' ) ? true : false;
+
+                                                                                                     
                                                
         _SetTitle( journalId );
         _SetSubtitle( journalId );
         _SetModel( journalId );
         _SetBannerColor( journalId );
-        _SetFaqBtn(tournamentId);
-        _UpdateStoreItems();
+        _SetFaqBtn(tournamentId, bNoItemsOnSale);
+        _UpdateStoreItems( bNoItemsOnSale );
         _UpdateActivateBtn();
         
                          
@@ -79,11 +83,11 @@ var TournamentJournal = ( function()
         _SetEventSticker( tournamentId );
         _UpdateSetChargesBtn( ( m_activeTournament === tournamentId ) ? InventoryAPI.GetFauxItemIDFromDefAndPaintIndex( g_ActiveTournamentInfo.itemid_charge, 0 ) : null );
         _UpdateApplyCharges();
-        _SetWinners( tournamentId, journalId );
+        _SetWinners( oWinningTeam, tournamentId, journalId );
         _SetUpSpray( journalId );
-        _WatchStreamBtn( journalId );
+        _WatchStream( journalId );
     };
-    
+
     var GetPassToActivate = function()
     {
         var journalId = $.GetContextPanel().GetAttributeString( "journalid", '' );
@@ -158,7 +162,7 @@ var TournamentJournal = ( function()
         var completedChallenges = m_test_challenges.filter( function( entry ) { return entry.value === 1; } );
 
         _SetPoints( completedChallenges );
-        if ( !threshold || ( completedChallenges.length === m_test_challenges.length ) )
+        if ( !threshold || ( completedChallenges.length === m_test_challenges.length ) || !m_isTournament_active )
         {
             $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-remaining' ).visible = false;
             return;
@@ -290,28 +294,6 @@ var TournamentJournal = ( function()
             elChallenge.BLoadLayoutSnippet( "tournament-challenge" );
             elChallenge.SetHasClass( 'dark', true );
 
-			                            
-			    
-			   	                                                                        
-			    
-                                            
-                
-                                                                                
-                
-                    
-                
-                                     
-                    
-                                                                     
-                    
-
-                                                                            
-                    
-                                                
-                                                                     
-                    
-                
-
             $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-container' ).AddBlurPanel( elChallenge );
             
             return elChallenge;
@@ -332,7 +314,10 @@ var TournamentJournal = ( function()
                                                                                                           
             var bForceEnablePlayContext = false;                                                                        
 
-            elChallenge.enabled = objData.value !== 1 && !m_isInMatch && ( m_activeTournament === tournamentId || bForceEnablePlayContext );
+            elChallenge.enabled = objData.value !== 1
+                && !m_isInMatch
+                && m_isTournament_active
+                && ( m_activeTournament === tournamentId || bForceEnablePlayContext );
 
             if ( objData.context === "trophy" || objData.context === "calender" )
             {
@@ -340,12 +325,14 @@ var TournamentJournal = ( function()
             }
             else if ( objData.context === 'watch' )
             {
-                _OnWatchStream( elChallenge );
+                _OnWatchStream();
 			}
 			else if ( objData.context === 'play' )
             {
                 _OnActivatePlayChallenge( elChallenge, index );
             }
+
+            elChallenge.SetHasClass( 'tournament-over', !m_isTournament_active);
         }
 
         function _OnActivatePickemChallenge ( elPanel, index, tournamentId )
@@ -480,9 +467,10 @@ var TournamentJournal = ( function()
         }
     };
 
-    var _OnWatchStream = function( elPanel )
+    var _OnWatchStream = function()
     {
-        elPanel.SetPanelEvent( 'onactivate', function()
+        var elbtn = $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-watch-stream' );
+        elbtn.SetPanelEvent( 'onactivate', function()
         {
             SteamOverlayAPI.OpenURL( 'https://steam.tv/csgo' );
         } );
@@ -491,11 +479,13 @@ var TournamentJournal = ( function()
     var _SetUpSpray = function( journalId )
     {
         var elPanel = $.GetContextPanel().FindChildInLayoutFile( 'id-graffiti-block' );
-        if ( !_IsValidJournalId( journalId ) )
+        if ( !_IsValidJournalId( journalId ) || !m_isTournament_active )
         {
+            elPanel.visible = false;
             return;
         }
 
+        elPanel.visible = true;
         var journalId = $.GetContextPanel().GetAttributeString( "journalid", '' );
         var elImage = $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-spray' );
         elImage.itemid = ItemInfo.GetFauxReplacementItemID( journalId, 'graffiti' );
@@ -520,52 +510,87 @@ var TournamentJournal = ( function()
         _ClosePopup();
     };
 
-    var _WatchStreamBtn = function( journalId )
+    var _WatchStream = function( journalId )
     {   
-        var elPanel = $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-watch-stream' );
+        var elPanel = $.GetContextPanel().FindChildInLayoutFile( 'id-steam-block' );
         var isPerfectWorld = MyPersonaAPI.GetLauncherType() === "perfectworld" ? true : false;
-        if ( !_IsValidJournalId( journalId ) || isPerfectWorld )
+        if ( !_IsValidJournalId( journalId ) || isPerfectWorld || !m_isTournament_active )
         {
-            if( elPanel && elPanel.IsValid() )
-            {
-                                           
-                elPanel.enabled = false;
-                elPanel.SetHasClass('opacity-none', true )
-            }
-
+            elPanel.visible = false;
             return;
         }
 
-        elPanel.enabled = true;
-        elPanel.SetHasClass('opacity-none', false )
-        _OnWatchStream( elPanel );
+        elPanel.visible = true;
+        _OnWatchStream();
     };
 
-    var _SetWinners = function( tournamentId, journalId )
+    var _SetWinners = function( ObjWinner, tournamentId, journalId )
     {
-        if ( !_IsValidJournalId( journalId ) || m_activeTournament === tournamentId )
+        var elPanel = $.GetContextPanel().FindChildInLayoutFile( 'id-winners-block' );
+        if (  m_isTournament_active || !_IsValidJournalId( journalId ))
         {
+            elPanel.visible = false;
             return false;
         }
 
-                                                                      
-        var aData = [
-            { tournamentId: 15, team: 'astr', teamname: '#CSGO_TeamID_60', descString: '#CSGO_CollectibleCoin_Katowice2019_Champion' },
-            { tournamentId: 16, team: 'astr', teamname: '#CSGO_TeamID_60', descString: '#CSGO_CollectibleCoin_berlin2019_Champion' }
-                                      
-        ];
-
-        var ObjWinner = aData.filter( winner => winner.tournamentId == tournamentId )[0];
-
-        $.GetContextPanel().FindChildInLayoutFile( 'tournament-journal-winners-img' ).SetImage( "file://{images}/tournaments/teams/" + ObjWinner.team +".svg"); 
-        $.GetContextPanel().FindChildInLayoutFile( 'tournament-journal-winners-desc' ).text = $.Localize( ObjWinner.descString );
-        $.GetContextPanel().FindChildInLayoutFile( 'tournament-journal-winners-title' ).text = $.Localize( ObjWinner.teamname );
+        elPanel.visible = true;
+        $.GetContextPanel().FindChildInLayoutFile( 'tournament-journal-winners-img' ).SetImage( "file://{images}/tournaments/teams/" + ObjWinner[ 'tag' ] +".svg"); 
+        $.GetContextPanel().FindChildInLayoutFile( 'tournament-journal-winners-desc' ).text = $.Localize( 'Place_Name_1st' );
+        $.GetContextPanel().FindChildInLayoutFile( 'tournament-journal-winners-title' ).text = $.Localize( 'CSGO_TeamID_' + ObjWinner[ 'team_id' ] );
 
         var elModel = $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-trophy' );
         elModel.SetCameraPreset( 1, false );
         elModel.SetSceneIntroRotation( -12.0, 30, 1 );
         elModel.SetFlashlightColor( 2, 2, 2 );
+        _SetPlayerPhotos( ObjWinner, tournamentId );
     };
+
+    var _SetPlayerPhotos = function( ObjWinner, tournamentId )
+    {
+        let arrPlayers = Object.entries( ObjWinner[ 'players' ] );
+        var elPlayerContainer = $.GetContextPanel().FindChildInLayoutFile( 'tournament-journal-winners-players' );
+
+        arrPlayers.forEach( function( player )
+        {
+            let elPlayer = $.CreatePanel( 'Panel', elPlayerContainer, 'JsPlayerCard' );
+            elPlayer.BLoadLayoutSnippet( 'snippet-tournament-player' );
+            elPlayer.SetHasClass( 'hidden', false );
+
+            let elPlayerImage = elPlayer.FindChildTraverse( 'id-tournament-journal-player-photo' );
+            if ( elPlayerImage )
+            {
+                var tournament_event = 'tournament:' + tournamentId.toString();
+                var StickerID = PredictionsAPI.GetFakeItemIDToRepresentPlayerID( tournament_event, player[ 1 ][ 'accountid64' ] );
+                
+                                                         
+                                                                 
+                                            
+                let photo_url = "file://{images}/tournaments/avatars/" + tournamentId + "/" + player[ 1 ][ 'accountid64' ] + ".png";
+                elPlayerImage.SetImage( photo_url );
+
+                elPlayer.FindChildInLayoutFile( 'id-tournament-journal-player-sticker' ).itemid = StickerID;
+            }
+
+        } );
+
+                                             
+            
+                                                                                                          
+                                                                                          
+                                                                          
+
+                             
+                                                                                         
+
+                             
+                                                                                           
+                                   
+                
+                                                                                                                              
+                                                       
+                
+               
+    }
 
     var _UpdateSetChargesBtn = function( id )
     {
@@ -690,15 +715,30 @@ var TournamentJournal = ( function()
         _UpdateApplyCharges();
     };
 
-    var _SetFaqBtn = function( tournamentId )
+    var _SetFaqBtn = function( tournamentId, bNoItemsOnSale )
     {
-        $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-faq' ).SetPanelEvent( 'onactivate', function(){
+        var btn = $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-faq' );
+        if( bNoItemsOnSale )
+        {
+            btn.visible = false;
+            return;
+        }
+        
+        btn.SetPanelEvent( 'onactivate', function(){
             SteamOverlayAPI.OpenURL( 'https://store.steampowered.com/sale/csgostockholm' );
         });
+
+        btn.visible = true;
     };
 
-    var _UpdateStoreItems = function()
+    var _UpdateStoreItems = function( bNoItemsOnSale )
     {
+                                                        
+        if( bNoItemsOnSale )
+        {
+            return false;
+        }
+
         var elItemsPanel = $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-items' );
 		var elBlurPanel = $.GetContextPanel().FindChildInLayoutFile( 'id-tournament-journal-container' );
 		
@@ -728,22 +768,23 @@ var TournamentJournal = ( function()
                     extrapopupfullscreenstyle: true
                 }
                 elItem.BLoadLayout( "file://{resources}/layout/mainmenu_store_tile_linked.xml", false, false );
-                
-
                 elBlurPanel.AddBlurPanel( elItem );
+
+                if ( g_ActiveTournamentStoreLayout[ i ][ 0 ] === 4816 )
+                {
+                    elItem.SetHasClass( 'bright-background', true );
+                }
             }
 		};
 		
 		if ( bCanSellCapsules )
 			g_ActiveTournamentStoreLayout.forEach( fnCreateOffering );
 		else
-			fnCreateOffering( g_ActiveTournamentStoreLayout[0], 0 );
+            fnCreateOffering( g_ActiveTournamentStoreLayout[ 0 ], 0 );
     };
 
     var _IsPurchaseable = function( itemid )
     {
-        
-                                                                                         
         var schemaString = InventoryAPI.BuildItemSchemaDefJSON( itemid );
 
         if ( !schemaString )

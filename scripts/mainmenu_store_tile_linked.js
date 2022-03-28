@@ -26,6 +26,10 @@ var MainMenuStoreTileLinked = ( function()
 		var elStattrak = elImage.FindChildInLayoutFile( 'StoreItemStattrak' );
 		elStattrak.SetHasClass( 'hidden', !ItemInfo.IsStatTrak( itemIdLinked ) && !ItemInfo.IsStatTrak( itemId ) );
 
+		var isNewRelease = elItem.Data().oData.isNewRelease;
+		var elNewHighlight = elItem.FindChildInLayoutFile( 'StoreItemNew' );
+		elNewHighlight.SetHasClass( 'hidden', !isNewRelease );
+
 		var elStoreItemName = elItem.FindChildInLayoutFile( 'StoreItemName' );
 		var elShortNameHeader = elItem.FindChildInLayoutFile( 'ShortName' );
 		var strItemName = '';
@@ -67,7 +71,9 @@ var MainMenuStoreTileLinked = ( function()
 		if ( reduction )
 		{
 			elSale.visible = true;
-			elSale.text = ItemInfo.GetStoreOriginalPrice( priceItemFirst, 1 ) + ' - ' +  ItemInfo.GetStoreOriginalPrice( priceItemLast, 1 );
+			elSale.text = ItemInfo.GetStoreOriginalPrice( priceItemFirst, 1 ) === ItemInfo.GetStoreOriginalPrice( priceItemLast, 1 ) ?
+				ItemInfo.GetStoreOriginalPrice( priceItemFirst, 1 ) :
+				ItemInfo.GetStoreOriginalPrice( priceItemFirst, 1 ) + ' - ' + ItemInfo.GetStoreOriginalPrice( priceItemLast, 1 );
 
 			elPrecent.visible = true;
 			elPrecent.text = reduction;
@@ -81,7 +87,9 @@ var MainMenuStoreTileLinked = ( function()
 		var elPrice = elItem.FindChildInLayoutFile( 'StoreItemPrice' );
 		if ( ItemInfo.GetStoreSalePrice( priceItemFirst, 1 ) )
 		{
-			elPrice.text = ItemInfo.GetStoreSalePrice( priceItemFirst, 1 ) + ' - ' + ItemInfo.GetStoreSalePrice( priceItemLast, 1 );
+			elPrice.text = ItemInfo.GetStoreSalePrice( priceItemFirst, 1 ) === ItemInfo.GetStoreSalePrice( priceItemLast, 1 ) ?
+				ItemInfo.GetStoreSalePrice( priceItemFirst, 1 ) : 
+				ItemInfo.GetStoreSalePrice( priceItemFirst, 1 ) + ' - ' + ItemInfo.GetStoreSalePrice( priceItemLast, 1 );
 		}
 		else
 		{
